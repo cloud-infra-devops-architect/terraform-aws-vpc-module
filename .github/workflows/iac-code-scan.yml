@@ -80,8 +80,12 @@ jobs:
         with:
           tflint_version: v0.61.0
 
-      - name: Install pre-commit
-        run: pip install pre-commit
+      - name: Install pre-commit and Checkov
+        run: pip install pre-commit checkov
+
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Run pre-commit hooks
         run: pre-commit run --all-files --show-diff-on-failure

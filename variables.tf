@@ -140,6 +140,11 @@ variable "owner" {
   type        = string
 }
 
+variable "email" {
+  description = "Email address of the team or individual responsible for this VPC"
+  type        = string
+}
+
 variable "tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)

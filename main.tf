@@ -15,6 +15,7 @@ locals {
     Environment = var.environment
     Project     = var.project
     Owner       = var.owner
+    Email       = var.email
   })
 }
 

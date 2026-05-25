@@ -21,7 +21,7 @@ provider "aws" {
 }
 
 module "vpc" {
-  source = "github.com/cloud-infra-devops/terraform-aws-vpc-module?ref=v1.0.2"
+  source = "../"
 
   # ── Required inputs ────────────────────────────────────────────────────────
   aws_region = "us-east-1"
@@ -33,6 +33,10 @@ module "vpc" {
   project     = "duke-data-aim-ima"
   owner       = "cloud-infra-devops"
   email       = "cloud-infra-devops@duke-energy.com"
+
+  tags = {
+    Team = "Cloud DevOps Platform Engineering"
+  }
 
   # ── Optional: subnet layout ────────────────────────────────────────────────
   num_public_subnets  = 3         # one per AZ

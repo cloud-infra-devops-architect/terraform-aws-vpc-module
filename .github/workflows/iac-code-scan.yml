@@ -24,35 +24,13 @@ on:
     paths-ignore:
       - "**/README.md"
   pull_request:
-    branches: ["develop", "release", "master", "main"]
-    types:
-      [
-        assigned,
-        unassigned,
-        labeled,
-        unlabeled,
-        opened,
-        edited,
-        closed,
-        reopened,
-        synchronize,
-        converted_to_draft,
-        ready_for_review,
-        locked,
-        unlocked,
-        review_requested,
-        review_request_removed,
-        auto_merge_enabled,
-        auto_merge_disabled,
-      ]
+    branches: ["feature/*", "develop", "release", "master", "main"]
+    types: [assigned, opened, reopened, edited, ready_for_review, synchronize]
 env:
-  # tfcode_path: "."
-  # TF_CLOUD_ORGANIZATION: "cloud-infra-devops-architect"
-  # TF_API_TOKEN: "${{ secrets.TF_API_TOKEN }}"
-  # TF_WORKSPACE: "gh-actions-pipeline"
-  # AWS_REGION: ${{ secrets.AWS_REGION }}
-  CONFIG_DIRECTORY: "."
-  TF_LOG: INFO
+  tfcode_path: "."
+  # tfc_hostname: "app.terraform.io"
+  # tfc_organisation: "cloud-infra-dev"
+  # tfc_workspace: "testing-terraform-aws-modules"
 
 jobs:
   pre-commit-hooks:
@@ -61,7 +39,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -72,23 +50,33 @@ jobs:
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
 
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v6.2.2
         with:
           tflint_version: v0.61.0
 
-      - name: Install pre-commit and Checkov
+      - name: Install pre-commit and checkov
         run: pip install pre-commit checkov
 
       - name: Install Trivy
         run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.70.0
+          mkdir -p ~/.cache/trivy/policy/content/policies/cloud/policies/cloudstack
+          mkdir -p ~/.cache/trivy/policy/content/policies/docker
+
+      - name: Install gitleaks
+        run: |
+          curl -sSLo gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.27.2/gitleaks_8.27.2_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/
 
       - name: Run pre-commit hooks
         run: pre-commit run --all-files --show-diff-on-failure
+        env:
+          SKIP: no-commit-to-branch
+          TF_CLI_ARGS_init: "-backend=false"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   check-required-files:
     runs-on: ubuntu-latest
@@ -97,7 +85,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -107,6 +95,14 @@ jobs:
           if [ ! -f "examples/main.tf" ]; then
             echo "::error::Missing required file: examples/main.tf"
             missing=1
+          fi
+          if [ ! -f "examples/variables.tf" ]; then
+          echo "::error::Missing required file: examples/variables.tf"
+          missing=1
+          fi
+          if [ ! -f "examples/outputs.tf" ]; then
+          echo "::error::Missing required file: examples/outputs.tf"
+          missing=1
           fi
           if [ ! -f "examples/README.md" ]; then
           echo "::error::Missing required file: examples/README.md"
@@ -129,13 +125,12 @@ jobs:
   infracost:
     runs-on: ubuntu-latest
     needs: check-required-files
-    if: github.event_name == 'pull_request'
     permissions:
       contents: read
       pull-requests: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -147,7 +142,7 @@ jobs:
       - name: Generate Infracost cost estimate
         run: |
           infracost breakdown \
-            --path=${{ env.CONFIG_DIRECTORY }} \
+            --path=${{ env.tfcode_path }} \
             --format=json \
             --out-file=/tmp/infracost.json
 
@@ -172,14 +167,14 @@ jobs:
       packages: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Run Checkov scan
         uses: bridgecrewio/checkov-action@v12.3092.0
         with:
-          directory: ${{ env.CONFIG_DIRECTORY }}
+          directory: ${{ env.tfcode_path }}
           framework: terraform
           output_format: cli,sarif
           output_file_path: console,results.sarif
@@ -193,6 +188,7 @@ jobs:
       #   with:
       #     sarif_file: results.sarif
       #     category: checkov
+
   trivy-scan:
     runs-on: ubuntu-latest
     needs: check-required-files
@@ -201,24 +197,28 @@ jobs:
       packages: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
       - name: Run Trivy config scan for Terraform
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: "config"
           ignore-unfixed: true
-          scan-ref: ${{ env.CONFIG_DIRECTORY }}
+          scan-ref: ${{ env.tfcode_path }}
           format: "table"
           severity: "CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN"
           exit-code: "1"
           trivy-config: trivy.yaml
+          version: "v0.70.0"
+
       - name: Fail on Trivy misconfiguration findings
         if: failure()
         run: |
           echo "::error::Trivy detected misconfiguration errors. Review the scan output above."
           exit 1
+
   tflint-scan:
     runs-on: ubuntu-latest
     needs: check-required-files
@@ -227,18 +227,21 @@ jobs:
       packages: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v6.2.2
         with:
           tflint_version: v0.61.0
+
       - name: Run TFLint
         run: |
           tflint --init
-          tflint --chdir=${{ env.CONFIG_DIRECTORY }} --format=compact
+          tflint --chdir=${{ env.tfcode_path }} --format=compact
         continue-on-error: false
+
   amazonq-rules-check:
     runs-on: ubuntu-latest
     needs: check-required-files
@@ -246,7 +249,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
@@ -332,34 +335,35 @@ jobs:
           amazonq="${{ needs.amazonq-rules-check.result }}"
 
           status_icon()  { [[ "$1" == "success" ]] && echo "✅ PASSED" || echo "❌ FAILED"; }
-          status_color() { [[ "$1" == "success" ]] && echo "\e[32m" || echo "\e[31m"; }
-          RESET="\e[0m"
-          BOLD="\e[1m"
-          CYAN="\e[36m"
+          status_color() { [[ "$1" == "success" ]] && echo $'\e[32m' || echo $'\e[31m'; }
+          RESET=$'\e[0m'
+          BOLD=$'\e[1m'
+          CYAN=$'\e[36m'
 
           echo ""
           echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════╗${RESET}"
-          echo -e "${BOLD}${CYAN}║       🔍  IaC Security Scan Results Summary      ║${RESET}"
-          echo -e "${BOLD}${CYAN}╠══════════════════════════════════════════════════╣${RESET}"
-          echo -e "${BOLD}${CYAN}║  Tool              │ Status                      ║${RESET}"
-          echo -e "${BOLD}${CYAN}╠════════════════════╪═════════════════════════════╣${RESET}"
-          echo -e "${BOLD}${CYAN}║${RESET}  🪝  Pre-commit     │ $(status_color $precommit)${BOLD}$(status_icon $precommit)${RESET}$(status_color $precommit)                     ${RESET}${BOLD}${CYAN}║${RESET}"
-          echo -e "${BOLD}${CYAN}║${RESET}  💰  Infracost      │ $(status_color $infracost)${BOLD}$(status_icon $infracost)${RESET}$(status_color $infracost)                     ${RESET}${BOLD}${CYAN}║${RESET}"
-          echo -e "${BOLD}${CYAN}║${RESET}  🛡️  Checkov        │ $(status_color $checkov)${BOLD}$(status_icon $checkov)${RESET}$(status_color $checkov)                     ${RESET}${BOLD}${CYAN}║${RESET}"
-          echo -e "${BOLD}${CYAN}║${RESET}  🔬  Trivy          │ $(status_color $trivy)${BOLD}$(status_icon $trivy)${RESET}$(status_color $trivy)                     ${RESET}${BOLD}${CYAN}║${RESET}"
-          echo -e "${BOLD}${CYAN}║${RESET}  🧹  TFLint         │ $(status_color $tflint)${BOLD}$(status_icon $tflint)${RESET}$(status_color $tflint)                     ${RESET}${BOLD}${CYAN}║${RESET}"
-          echo -e "${BOLD}${CYAN}║${RESET}  🤖  Amazon Q Rules │ $(status_color $amazonq)${BOLD}$(status_icon $amazonq)${RESET}$(status_color $amazonq)                     ${RESET}${BOLD}${CYAN}║${RESET}"
-          echo -e "${BOLD}${CYAN}╠══════════════════════════════════════════════════╣${RESET}"
+          echo -e "${BOLD}${CYAN}║     IaC Security Scan Results Summary            ║${RESET}"
+          echo -e "${BOLD}${CYAN}╠═══════════════════════╦══════════════════════════╣${RESET}"
+          echo -e "${BOLD}${CYAN}║  Tool                 ║  Status                  ║${RESET}"
+          echo -e "${BOLD}${CYAN}╠═══════════════════════╬══════════════════════════╣${RESET}"
+          row() { local label="$1" result="$2" icon color; icon=$(status_icon "$result"); color=$(status_color "$result"); printf "${BOLD}${CYAN}║${RESET}  %-21s${BOLD}${CYAN}║${RESET}  %s${BOLD}%s${RESET}%-*s${BOLD}${CYAN}║${RESET}\n" "$label" "$color" "$icon" $((24 - ${#icon})) ""; }
+          row "Pre-Push Hooks"    "$precommit"
+          row "Infracost"         "$infracost"
+          row "Checkov"           "$checkov"
+          row "Trivy"             "$trivy"
+          row "TFLint"            "$tflint"
+          row "Amazon Q Rules"    "$amazonq"
+          echo -e "${BOLD}${CYAN}╠═══════════════════════╩══════════════════════════╣${RESET}"
 
-          if [[ "$precommit" != "success" || ("$infracost" != "success" && "$infracost" != "skipped") || "$checkov" != "success" || "$trivy" != "success" || "$tflint" != "success" || "$amazonq" != "success" ]]; then
-            echo -e "${BOLD}${CYAN}║${RESET}  ${BOLD}\e[31m⛔  Overall: FAILED — review scan output above${RESET}   ${BOLD}${CYAN}║${RESET}"
+          if [[ "$precommit" != "success" || "$infracost" != "success" || "$checkov" != "success" || "$trivy" != "success" || "$tflint" != "success" || "$amazonq" != "success" ]]; then
+            echo -e "${BOLD}${CYAN}║${RESET}  ${BOLD}\e[31mOverall: FAILED  -- review scan output above  ${RESET}  ${BOLD}${CYAN}║${RESET}"
             echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════╝${RESET}"
             echo ""
             echo "::error::One or more scans failed. pre-commit=$precommit, infracost=$infracost, checkov=$checkov, trivy=$trivy, tflint=$tflint, amazonq=$amazonq"
             exit 1
           fi
 
-          echo -e "${BOLD}${CYAN}║${RESET}  ${BOLD}\e[32m🎉  Overall: ALL SCANS PASSED SUCCESSFULLY!${RESET}      ${BOLD}${CYAN}║${RESET}"
+          echo -e "${BOLD}${CYAN}║${RESET}  ${BOLD}\e[32mOverall: ALL SCANS PASSED SUCCESSFULLY!       ${RESET}  ${BOLD}${CYAN}║${RESET}"
           echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════╝${RESET}"
           echo ""
 

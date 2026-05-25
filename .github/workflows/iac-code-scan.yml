@@ -129,10 +129,10 @@ jobs:
   infracost:
     runs-on: ubuntu-latest
     needs: check-required-files
+    if: github.event_name == 'pull_request'
     permissions:
       contents: read
       pull-requests: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -351,7 +351,7 @@ jobs:
           echo -e "${BOLD}${CYAN}║${RESET}  🤖  Amazon Q Rules │ $(status_color $amazonq)${BOLD}$(status_icon $amazonq)${RESET}$(status_color $amazonq)                     ${RESET}${BOLD}${CYAN}║${RESET}"
           echo -e "${BOLD}${CYAN}╠══════════════════════════════════════════════════╣${RESET}"
 
-          if [[ "$precommit" != "success" || "$infracost" != "success" || "$checkov" != "success" || "$trivy" != "success" || "$tflint" != "success" || "$amazonq" != "success" ]]; then
+          if [[ "$precommit" != "success" || ("$infracost" != "success" && "$infracost" != "skipped") || "$checkov" != "success" || "$trivy" != "success" || "$tflint" != "success" || "$amazonq" != "success" ]]; then
             echo -e "${BOLD}${CYAN}║${RESET}  ${BOLD}\e[31m⛔  Overall: FAILED — review scan output above${RESET}   ${BOLD}${CYAN}║${RESET}"
             echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════╝${RESET}"
             echo ""

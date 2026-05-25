@@ -15,7 +15,7 @@ on:
       # TF_API_TOKEN:
       #   required: true
       INFRACOST_API_KEY:
-        required: true
+        required: false
   # Triggers the workflow on push or pull request events
   push:
     branches-ignore:
@@ -158,6 +158,7 @@ jobs:
         uses: infracost/actions/setup@v3
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
+        continue-on-error: true
 
       - name: Generate Infracost cost estimate
         run: |
@@ -375,7 +376,7 @@ jobs:
           row "Amazon Q Rules"    "$amazonq"
           echo -e "${BOLD}${CYAN}╠═══════════════════════╩══════════════════════════╣${RESET}"
 
-          if [[ "$precommit" != "success" || "$infracost" != "success" || "$checkov" != "success" || "$trivy" != "success" || "$tflint" != "success" || "$amazonq" != "success" ]]; then
+          if [[ "$precommit" != "success" || ("$infracost" != "success" && "$infracost" != "skipped") || "$checkov" != "success" || "$trivy" != "success" || "$tflint" != "success" || "$amazonq" != "success" ]]; then
             echo -e "${BOLD}${CYAN}║${RESET}  ${BOLD}\e[31mOverall: FAILED  -- review scan output above  ${RESET}  ${BOLD}${CYAN}║${RESET}"
             echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════╝${RESET}"
             echo ""

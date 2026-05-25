@@ -23,4 +23,4 @@ repos:
           - "--args=--skip-check CKV_TF_1"
       - id: terraform_trivy
         args:
-          - "--args=--config trivy.yaml"
+          - "--args=--config __GIT_WORKING_DIR__/trivy.yaml"

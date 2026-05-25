@@ -24,8 +24,27 @@ on:
     paths-ignore:
       - "**/README.md"
   pull_request:
-    branches: ["feature/*", "develop", "release", "master", "main"]
-    types: [assigned, opened, reopened, edited, ready_for_review, synchronize]
+    branches: ["develop", "release", "master", "main"]
+    types:
+      [
+        assigned,
+        unassigned,
+        labeled,
+        unlabeled,
+        opened,
+        edited,
+        closed,
+        reopened,
+        synchronize,
+        converted_to_draft,
+        ready_for_review,
+        locked,
+        unlocked,
+        review_requested,
+        review_request_removed,
+        auto_merge_enabled,
+        auto_merge_disabled,
+      ]
 env:
   tfcode_path: "."
   # tfc_hostname: "app.terraform.io"

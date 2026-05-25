@@ -24,3 +24,6 @@ repos:
       - id: terraform_trivy
         args:
           - "--args=--config __GIT_WORKING_DIR__/trivy.yaml"
+          - "--args=--cache-dir /tmp/trivy-cache"
+        stages: [pre-commit]
+        pass_filenames: false

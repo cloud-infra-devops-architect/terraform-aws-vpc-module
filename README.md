@@ -469,5 +469,3 @@ feature/* ──push──► guard-direct-push ✅ → pre-commit-hooks → ...
 > - ✅ **Lock branch** — makes the branch read-only; all changes must go through a PR
 
 ---
-
-

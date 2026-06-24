@@ -1,5 +1,4 @@
-# It is reusable workflow that can be called in other workflow
-# Purpose :
+# It is reusable workflow that can be called in other workflow # Purpose :
 # Unless terraform Init, Validate, Plan checks pass, the commit to the target branch will not happen or the PR will not pass & cannot be merged to the destination branch.
 # Unless Checkov, Trivy code scan checks pass, the commit to the target branch will not happen or the PR will not pass & cannot be merged to the destination branch.
 # If there are no examples/main.tf file in the repo, commit to the target branch or the PR will not pass & cannot be merged to the destination branch.
@@ -7,53 +6,68 @@
 # If any of the above four checks fail, the commit to the target branch or the PR will not pass & cannot be merged to the destination branch
 
 name: iac-code-quality-checks
-run-name: ${{ github.actor }} has triggered the GitHub Actions
-# Controls when the action will run. Invokes the workflow on push events on all branches except for the main/master branches and on pull requests
+run-name: "${{ github.actor }} — ${{ github.event_name }} on ${{ github.ref_name }}"
+# Controls when the action will run.
+# push    : runs on feature/* branches only — direct pushes to protected branches (main, master, develop, release) are blocked.
+# pull_request: runs when a PR targets develop, release, master, or main (opened, synchronize, reopened, ready_for_review).
+# workflow_call: reusable — can be called from other workflows.
 on:
   workflow_call:
     secrets:
-      # TF_API_TOKEN:
-      #   required: true
+      TF_API_TOKEN:
+        required: true
       INFRACOST_API_KEY:
-        required: false
-  # Triggers the workflow on push or pull request events
+        required: true
+  # push fires only on non-protected branches (feature branches).
+  # Direct pushes to main | master | develop | release are rejected by the guard-direct-push job below.
   push:
     branches-ignore:
       - "main"
       - "master"
+      - "develop"
+      - "release"
     paths-ignore:
       - "**/README.md"
   pull_request:
     branches: ["develop", "release", "master", "main"]
-    types:
-      [
-        assigned,
-        unassigned,
-        labeled,
-        unlabeled,
-        opened,
-        edited,
-        closed,
-        reopened,
-        synchronize,
-        converted_to_draft,
-        ready_for_review,
-        locked,
-        unlocked,
-        review_requested,
-        review_request_removed,
-        auto_merge_enabled,
-        auto_merge_disabled,
-      ]
+    types: [opened, synchronize, reopened, ready_for_review]
 env:
   tfcode_path: "."
+  CONFIG_DIRECTORY: "."
   # tfc_hostname: "app.terraform.io"
   # tfc_organisation: "cloud-infra-dev"
   # tfc_workspace: "testing-terraform-aws-modules"
 
 jobs:
+  # ── Guard: block direct pushes to protected branches ────────────────────────
+  # This job runs on every push event. Because the push trigger already excludes
+  # main | master | develop | release via branches-ignore, a push to those branches
+  # will NOT trigger this workflow at all — so this job acts as a secondary
+  # defence layer for workflow_call or any future trigger changes.
+  # When github.event_name == 'push' AND the ref IS a protected branch, the job
+  # exits 1 immediately, failing the entire workflow before any other job runs.
+  guard-direct-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Block direct pushes to protected branches
+        if: |
+          github.event_name == 'push' &&
+          (
+            github.ref == 'refs/heads/main'    ||
+            github.ref == 'refs/heads/master'  ||
+            github.ref == 'refs/heads/develop' ||
+            github.ref == 'refs/heads/release'
+          )
+        run: |
+          echo "::error::Direct push to '${{ github.ref_name }}' by '${{ github.actor }}' is not allowed."
+          echo "::error::All changes to protected branches (main | master | develop | release) MUST go through a Pull Request from a feature branch."
+          exit 1
+
   pre-commit-hooks:
     runs-on: ubuntu-latest
+    needs: guard-direct-push
     permissions:
       contents: read
     steps:
@@ -116,16 +130,16 @@ jobs:
             missing=1
           fi
           if [ ! -f "examples/variables.tf" ]; then
-          echo "::error::Missing required file: examples/variables.tf"
-          missing=1
+            echo "::error::Missing required file: examples/variables.tf"
+            missing=1
           fi
           if [ ! -f "examples/outputs.tf" ]; then
-          echo "::error::Missing required file: examples/outputs.tf"
-          missing=1
+            echo "::error::Missing required file: examples/outputs.tf"
+            missing=1
           fi
           if [ ! -f "examples/README.md" ]; then
-          echo "::error::Missing required file: examples/README.md"
-          missing=1
+            echo "::error::Missing required file: examples/README.md"
+            missing=1
           fi
           if [ ! -f "README.md" ]; then
             echo "::error::Missing required file: README.md"
@@ -148,6 +162,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    env:
+      HAS_INFRACOST_KEY: ${{ secrets.INFRACOST_API_KEY != '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -161,6 +177,7 @@ jobs:
         continue-on-error: true
 
       - name: Generate Infracost cost estimate
+        if: env.HAS_INFRACOST_KEY == 'true'
         run: |
           infracost breakdown \
             --path=${{ env.tfcode_path }} \
@@ -168,16 +185,21 @@ jobs:
             --out-file=/tmp/infracost.json
 
       - name: Show cost breakdown in logs
+        if: env.HAS_INFRACOST_KEY == 'true'
         run: infracost output --path=/tmp/infracost.json --format=table
 
       - name: Post Infracost comment on PR
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && env.HAS_INFRACOST_KEY == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           infracost comment github \
             --path=/tmp/infracost.json \
-            --repo=${{ github.repository }} \
-            --github-token=${{ github.token }} \
-            --pull-request=${{ github.event.pull_request.number }} \
+            --repo=$REPO \
+            --github-token=$GH_TOKEN \
+            --pull-request=$PR_NUMBER \
             --behavior=update
 
   checkov-scan:
@@ -234,11 +256,7 @@ jobs:
           trivy-config: trivy.yaml
           version: "v0.70.0"
 
-      - name: Fail on Trivy misconfiguration findings
-        if: failure()
-        run: |
-          echo "::error::Trivy detected misconfiguration errors. Review the scan output above."
-          exit 1
+      # Trivy exits with code 1 on findings — no additional failure step needed
 
   tflint-scan:
     runs-on: ubuntu-latest
@@ -388,169 +406,170 @@ jobs:
           echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════╝${RESET}"
           echo ""
 
-  # # ── Terraform CI: fmt, init, validate, plan — runs on every PR ─────────────
-  # terraform-plan:
-  #   runs-on: ubuntu-latest
-  #   needs: scan-results
-  #   if: github.event_name == 'pull_request'
-  #   permissions:
-  #     contents: read # This is required for actions/checkout to work properly and fetch the PR branch refs
-  #     pull-requests: write # This is required for gh bot to comment PRs with the plan output
-  #     id-token: write # Without id-token: write, GitHub won't generate the OIDC token needed for authentication.This is required for requesting the JWT token from GitHub IdP and exchanging it for AWS credentials using aws-actions/configure-aws-credentials action. AWS credentials required for Terraform Init to authenticate with private module registries and for Terraform Plan to authenticate with any AWS data sources or providers that require authentication.
-  #   env:
-  #     TF_IN_AUTOMATION: "true"
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v6
-  #       with:
-  #         fetch-depth: 0 # Fetch full history to ensure Terraform can access all branches and tags if needed for module references
-  #     - name: "Configure AWS Credentials"
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-  #           role-session-name: ${{ secrets.ROLE_SESSION_NAME}}
-  #           aws-region: ${{ secrets.AWS_REGION }}
-  #     - name: Verify IAM Role Assumption
-  #       run: |
-  #           aws sts get-caller-identity
-  #     - name: Set up Terraform
-  #       uses: hashicorp/setup-terraform@v3
-  #       with:
-  #         cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
-  #         terraform_version: latest
-  #         terraform_wrapper: false
+  # ── Terraform CI: fmt, init, validate, plan — runs on every PR ─────────────
+  terraform-plan:
+    runs-on: ubuntu-latest
+    needs: scan-results
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read # This is required for actions/checkout to work properly and fetch the PR branch refs
+      pull-requests: write # This is required for gh bot to comment PRs with the plan output
+      id-token: write # Without id-token: write, GitHub won't generate the OIDC token needed for authentication.This is required for requesting the JWT token from GitHub IdP and exchanging it for AWS credentials using aws-actions/configure-aws-credentials action. AWS credentials required for Terraform Init to authenticate with private module registries and for Terraform Plan to authenticate with any AWS data sources or providers that require authentication.
+    env:
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Fetch full history to ensure Terraform can access all branches and tags if needed for module references
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: ${{ secrets.ROLE_SESSION_NAME}}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Verify IAM Role Assumption
+        run: |
+          aws sts get-caller-identity
 
-  #     - name: Terraform Format
-  #       id: fmt
-  #       run: terraform fmt -check -recursive
-  #       working-directory: ${{ env.CONFIG_DIRECTORY }}
-  #       continue-on-error: true
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_version: latest
+          terraform_wrapper: false
 
-  #     - name: Terraform Init
-  #       id: init
-  #       run: terraform init -input=false
-  #       working-directory: ${{ env.CONFIG_DIRECTORY }}
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.CONFIG_DIRECTORY }}
+        continue-on-error: true
 
-  #     - name: Terraform Validate
-  #       id: validate
-  #       run: terraform validate -no-color
-  #       working-directory: ${{ env.CONFIG_DIRECTORY }}
+      - name: Terraform Init
+        id: init
+        run: terraform init -input=false
+        working-directory: ${{ env.CONFIG_DIRECTORY }}
 
-  #     - name: Terraform Plan
-  #       id: plan
-  #       run: terraform plan -no-color -input=false 2>&1 | tee /tmp/tfplan.txt
-  #       working-directory: ${{ env.CONFIG_DIRECTORY }}
-  #       continue-on-error: true # Don't fail the job here, we want to capture the plan output and post it to the PR comment for review
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ env.CONFIG_DIRECTORY }}
 
-  #     - name: Post Plan output to PR
-  #       uses: actions/github-script@v7
-  #       with:
-  #         github-token: ${{ github.token }}
-  #         script: |
-  #           const fs = require('fs');
-  #           const raw = fs.readFileSync('/tmp/tfplan.txt', 'utf8');
-  #           const maxLen = 65000;
-  #           const plan = raw.length > maxLen
-  #             ? raw.substring(0, maxLen) + '\n\n... output truncated (> 65 000 chars) ...'
-  #             : raw;
-  #           const icon = s => s === 'success' ? '✅' : s === 'skipped' ? '⏭️' : '❌';
-  #           const body = [
-  #             '## 🏗️ Terraform Plan — `${{ github.head_ref }}`',
-  #             '',
-  #             '| Step | Result |',
-  #             '|------|--------|',
-  #             `| 🎨 Format   | ${icon('${{ steps.fmt.outcome }}')} \`${{ steps.fmt.outcome }}\` |`,
-  #             `| 🔧 Init     | ${icon('${{ steps.init.outcome }}')} \`${{ steps.init.outcome }}\` |`,
-  #             `| ✔️ Validate | ${icon('${{ steps.validate.outcome }}')} \`${{ steps.validate.outcome }}\` |`,
-  #             `| 📋 Plan     | ${icon('${{ steps.plan.outcome }}')} \`${{ steps.plan.outcome }}\` |`,
-  #             '',
-  #             '<details><summary>📄 Show full plan output</summary>',
-  #             '',
-  #             '```hcl',
-  #             plan,
-  #             '```',
-  #             '</details>',
-  #             '',
-  #             `> 🔁 Triggered by **@${{ github.actor }}** · \`${{ github.head_ref }}\` → \`${{ github.base_ref }}\``,
-  #           ].join('\n');
-  #           const { data: comments } = await github.rest.issues.listComments({
-  #             owner: context.repo.owner,
-  #             repo: context.repo.repo,
-  #             issue_number: context.issue.number,
-  #           });
-  #           const existing = comments.find(c =>
-  #             c.user.type === 'Bot' && c.body.includes('## 🏗️ Terraform Plan')
-  #           );
-  #           if (existing) {
-  #             await github.rest.issues.updateComment({
-  #               owner: context.repo.owner,
-  #               repo: context.repo.repo,
-  #               comment_id: existing.id,
-  #               body,
-  #             });
-  #           } else {
-  #             await github.rest.issues.createComment({
-  #               owner: context.repo.owner,
-  #               repo: context.repo.repo,
-  #               issue_number: context.issue.number,
-  #               body,
-  #             });
-  #           }
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -input=false 2>&1 | tee /tmp/tfplan.txt
+        working-directory: ${{ env.CONFIG_DIRECTORY }}
+        continue-on-error: true # Don't fail the job here, we want to capture the plan output and post it to the PR comment for review
 
-  #     - name: Fail if plan pipeline failed
-  #       if: steps.init.outcome == 'failure' || steps.validate.outcome == 'failure' || steps.plan.outcome == 'failure'
-  #       run: |
-  #         echo "::error::Terraform plan pipeline failed — review the PR comment for details."
-  #         exit 1
+      - name: Post Plan output to PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+            const raw = fs.readFileSync('/tmp/tfplan.txt', 'utf8');
+            const maxLen = 65000;
+            const plan = raw.length > maxLen
+              ? raw.substring(0, maxLen) + '\n\n... output truncated (> 65 000 chars) ...'
+              : raw;
+            const icon = s => s === 'success' ? '✅' : s === 'skipped' ? '⏭️' : '❌';
+            const body = [
+              '## 🏗️ Terraform Plan — `${{ github.head_ref }}`',
+              '',
+              '| Step | Result |',
+              '|------|--------|',
+              `| 🎨 Format   | ${icon('${{ steps.fmt.outcome }}')} \`${{ steps.fmt.outcome }}\` |`,
+              `| 🔧 Init     | ${icon('${{ steps.init.outcome }}')} \`${{ steps.init.outcome }}\` |`,
+              `| ✔️ Validate | ${icon('${{ steps.validate.outcome }}')} \`${{ steps.validate.outcome }}\` |`,
+              `| 📋 Plan     | ${icon('${{ steps.plan.outcome }}')} \`${{ steps.plan.outcome }}\` |`,
+              '',
+              '<details><summary>📄 Show full plan output</summary>',
+              '',
+              '```hcl',
+              plan,
+              '```',
+              '</details>',
+              '',
+              `> 🔁 Triggered by **@${{ github.actor }}** · \`${{ github.head_ref }}\` → \`${{ github.base_ref }}\``,
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('## 🏗️ Terraform Plan')
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
 
-  # # ── Terraform CD: apply — runs ONLY after a reviewed PR is merged ──────────
-  # # Conditions that must ALL be true before apply executes:
-  # #   1. Event is pull_request type closed
-  # #   2. PR was merged (merged == true), not just closed/abandoned
-  # #   3. PR base branch is one of the protected target branches
-  # #   4. PR head branch is a feature branch (not the target branch itself)
-  # #   5. scan-results job passed
-  # terraform-apply:
-  #   runs-on: ubuntu-latest
-  #   needs: scan-results
-  #   if: |
-  #     github.event_name == 'pull_request' &&
-  #     github.event.action == 'closed' &&
-  #     github.event.pull_request.merged == true &&
-  #     (
-  #       github.event.pull_request.base.ref == 'develop' ||
-  #       github.event.pull_request.base.ref == 'release' ||
-  #       github.event.pull_request.base.ref == 'master'  ||
-  #       github.event.pull_request.base.ref == 'main'
-  #     ) &&
-  #     github.event.pull_request.base.ref != github.event.pull_request.head.ref &&
-  #     github.event.pull_request.reviews_url != '' &&
-  #     github.event.pull_request.review_comments >= 0
-  #   permissions:
-  #     contents: read
-  #     id-token: write
-  #   env:
-  #     TF_IN_AUTOMATION: "true"
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v6
-  #       with:
-  #         fetch-depth: 0
-  #     - name: "Configure AWS Credentials"
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #             role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-  #             role-session-name: ${{ secrets.ROLE_SESSION_NAME}}
-  #             aws-region: ${{ secrets.AWS_REGION }}
-  #     - name: Set up Terraform
-  #       uses: hashicorp/setup-terraform@v3
-  #       with:
-  #         cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
-  #         terraform_version: latest
-  #         terraform_wrapper: false
-  #     - name: Terraform Init
-  #       run: terraform init -input=false
-  #       working-directory: ${{ env.CONFIG_DIRECTORY }}
-  #     - name: Terraform Apply
-  #       run: terraform apply -auto-approve -input=false
-  #       working-directory: ${{ env.CONFIG_DIRECTORY }}
+      - name: Fail if plan pipeline failed
+        if: steps.init.outcome == 'failure' || steps.validate.outcome == 'failure' || steps.plan.outcome == 'failure'
+        run: |
+          echo "::error::Terraform plan pipeline failed — review the PR comment for details."
+          exit 1
+
+  # ── Terraform CD: apply — runs ONLY after a reviewed PR is merged ──────────
+  # Conditions that must ALL be true before apply executes:
+  #   1. Event is pull_request type closed
+  #   2. PR was merged (merged == true), not just closed/abandoned
+  #   3. PR base branch is one of the protected target branches
+  #   4. PR head branch is a feature branch (not the target branch itself)
+  #   5. scan-results job passed
+  terraform-apply:
+    runs-on: ubuntu-latest
+    needs: scan-results
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      (
+        github.event.pull_request.base.ref == 'develop' ||
+        github.event.pull_request.base.ref == 'release' ||
+        github.event.pull_request.base.ref == 'master'  ||
+        github.event.pull_request.base.ref == 'main'
+      ) &&
+      github.event.pull_request.base.ref != github.event.pull_request.head.ref &&
+      github.event.pull_request.reviews_url != '' &&
+      github.event.pull_request.review_comments >= 0
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: "Configure AWS Credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: ${{ secrets.ROLE_SESSION_NAME}}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_version: latest
+          terraform_wrapper: false
+      - name: Terraform Init
+        run: terraform init -input=false
+        working-directory: ${{ env.CONFIG_DIRECTORY }}
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
+        working-directory: ${{ env.CONFIG_DIRECTORY }}

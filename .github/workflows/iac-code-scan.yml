@@ -439,19 +439,30 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -no-color -var-file="credentials.auto.tfvars" -input=false -out=/tmp/tfplan
+        run: terraform plan -no-color -var-file="credentials.auto.tfvars" -input=false -out=/tmp/tfplan 2>&1 | tee /tmp/plan_output.txt
         working-directory: ${{ env.tfcode_path }}
         continue-on-error: true # Don't fail the job here, we want to capture the plan output and post it to the PR comment for review
       - name: Save Terraform Plan Output
         if: github.event_name == 'pull_request'
-        run: terraform show -json /tmp/tfplan > /tmp/plan.json
+        run: |
+          if [ -f /tmp/tfplan ]; then
+            terraform show -no-color /tmp/tfplan > /tmp/plan.txt
+          else
+            {
+              echo "Terraform plan did not produce a saved plan file (/tmp/tfplan)."
+              echo "The plan step likely failed; captured command output is below:"
+              echo ""
+              cat /tmp/plan_output.txt
+            } > /tmp/plan.txt
+          fi
       - name: Post Plan output to PR
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v9.0.0
         with:
           github-token: ${{ github.token }}
           script: |
             const fs = require('fs');
-            const raw = fs.readFileSync('/tmp/plan.json', 'utf8');
+            const raw = fs.readFileSync('/tmp/plan.txt', 'utf8');
             const maxLen = 65000;
             const plan = raw.length > maxLen
               ? raw.substring(0, maxLen) + '\n\n... output truncated (> 65 000 chars) ...'

@@ -1,6 +1,10 @@
 data "aws_availability_zones" "available" {
-  state            = "available"
-  exclude_zone_ids = []
+  state = "available"
+
+  filter {
+    name   = "zone-type"
+    values = ["availability-zone"]
+  }
 }
 
 locals {

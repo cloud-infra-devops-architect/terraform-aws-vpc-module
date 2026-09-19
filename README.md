@@ -15,7 +15,7 @@ A Terraform module that creates a production-ready **AWS VPC** 🏗️ with publ
 
 ```hcl
 terraform {
-  required_version = ">= 1.14.0"
+  required_version = ">= 1.16.0"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -144,41 +144,41 @@ output "flow_log_cloudwatch_log_group" {
 
 ## 📥 Input Variables
 
-| Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| `aws_region` | 🌍 AWS region | `string` | — | ✅ yes |
-| `name` | 🏷️ Name prefix for all resources | `string` | `"vpc"` | no |
-| `vpc_cidr` | 🌐 Primary VPC CIDR block | `string` | — | ✅ yes |
-| `secondary_vpc_cidr` | 🌐 Secondary VPC CIDR (null to skip) | `string` | `null` | no |
-| `num_public_subnets` | 🌍 Number of public subnets | `number` | `2` | no |
-| `num_private_subnets` | 🔒 Number of private subnets per layer | `number` | `2` | no |
-| `num_layers` | 🗂️ Number of private subnet layers | `number` | `1` | no |
-| `instance_tenancy` | 🖥️ VPC tenancy (default/dedicated/host) | `string` | `"default"` | no |
-| `create_nat_gateway` | 🔀 Create NAT Gateway | `bool` | `true` | no |
-| `single_nat_gateway` | 🔀 Use one NAT GW instead of one per AZ | `bool` | `false` | no |
-| `enable_flow_logs` | 📋 Enable VPC Flow Logs | `bool` | `true` | no |
-| `flow_logs_retention_days` | 🗓️ Flow log CloudWatch retention days | `number` | `30` | no |
-| `enable_dns_hostnames` | 🔍 Enable DNS hostnames | `bool` | `true` | no |
-| `enable_dns_support` | 🔍 Enable DNS support | `bool` | `true` | no |
-| `cloudwatch_alarm_actions` | 🔔 SNS ARNs for alarm notifications | `list(string)` | `[]` | no |
-| `tags` | 🏷️ Common tags | `map(string)` | `{}` | no |
+| Name                       | Description                            | Type           | Default     | Required |
+| -------------------------- | -------------------------------------- | -------------- | ----------- | :------: |
+| `aws_region`               | 🌍 AWS region                           | `string`       | —           |  ✅ yes   |
+| `name`                     | 🏷️ Name prefix for all resources        | `string`       | `"vpc"`     |    no    |
+| `vpc_cidr`                 | 🌐 Primary VPC CIDR block               | `string`       | —           |  ✅ yes   |
+| `secondary_vpc_cidr`       | 🌐 Secondary VPC CIDR (null to skip)    | `string`       | `null`      |    no    |
+| `num_public_subnets`       | 🌍 Number of public subnets             | `number`       | `2`         |    no    |
+| `num_private_subnets`      | 🔒 Number of private subnets per layer  | `number`       | `2`         |    no    |
+| `num_layers`               | 🗂️ Number of private subnet layers      | `number`       | `1`         |    no    |
+| `instance_tenancy`         | 🖥️ VPC tenancy (default/dedicated/host) | `string`       | `"default"` |    no    |
+| `create_nat_gateway`       | 🔀 Create NAT Gateway                   | `bool`         | `true`      |    no    |
+| `single_nat_gateway`       | 🔀 Use one NAT GW instead of one per AZ | `bool`         | `false`     |    no    |
+| `enable_flow_logs`         | 📋 Enable VPC Flow Logs                 | `bool`         | `true`      |    no    |
+| `flow_logs_retention_days` | 🗓️ Flow log CloudWatch retention days   | `number`       | `30`        |    no    |
+| `enable_dns_hostnames`     | 🔍 Enable DNS hostnames                 | `bool`         | `true`      |    no    |
+| `enable_dns_support`       | 🔍 Enable DNS support                   | `bool`         | `true`      |    no    |
+| `cloudwatch_alarm_actions` | 🔔 SNS ARNs for alarm notifications     | `list(string)` | `[]`        |    no    |
+| `tags`                     | 🏷️ Common tags                          | `map(string)`  | `{}`        |    no    |
 
 ## 📤 Outputs
 
-| Name | Description |
-|------|-------------|
-| `vpc_id` | 🌐 VPC ID |
-| `vpc_cidr_block` | 🌐 Primary CIDR |
-| `secondary_cidr_block` | 🌐 Secondary CIDR (if created) |
-| `internet_gateway_id` | 🌍 IGW ID |
-| `public_subnet_ids` | 🌍 Public subnet IDs |
-| `private_subnet_ids` | 🔒 All private subnet IDs |
-| `private_subnet_ids_by_layer` | 🗂️ Map of layer → subnet IDs |
-| `nat_gateway_ids` | 🔀 NAT Gateway IDs |
-| `nat_gateway_public_ips` | 🔀 NAT Gateway Elastic IPs |
-| `public_route_table_id` | 🛣️ Public route table ID |
-| `private_route_table_ids` | 🛣️ Private route table IDs |
-| `flow_log_id` | 📋 Flow Log ID (null if disabled) |
+| Name                            | Description                                    |
+| ------------------------------- | ---------------------------------------------- |
+| `vpc_id`                        | 🌐 VPC ID                                       |
+| `vpc_cidr_block`                | 🌐 Primary CIDR                                 |
+| `secondary_cidr_block`          | 🌐 Secondary CIDR (if created)                  |
+| `internet_gateway_id`           | 🌍 IGW ID                                       |
+| `public_subnet_ids`             | 🌍 Public subnet IDs                            |
+| `private_subnet_ids`            | 🔒 All private subnet IDs                       |
+| `private_subnet_ids_by_layer`   | 🗂️ Map of layer → subnet IDs                    |
+| `nat_gateway_ids`               | 🔀 NAT Gateway IDs                              |
+| `nat_gateway_public_ips`        | 🔀 NAT Gateway Elastic IPs                      |
+| `public_route_table_id`         | 🛣️ Public route table ID                        |
+| `private_route_table_ids`       | 🛣️ Private route table IDs                      |
+| `flow_log_id`                   | 📋 Flow Log ID (null if disabled)               |
 | `flow_log_cloudwatch_log_group` | ☁️ CloudWatch Log Group name (null if disabled) |
 
 ## 🔔 CloudWatch Alarms

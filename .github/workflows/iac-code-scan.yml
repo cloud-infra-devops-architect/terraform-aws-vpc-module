@@ -343,7 +343,7 @@ jobs:
         checkov-scan,
         trivy-scan,
         tflint-scan,
-        amazonq-rules-check,
+        amazonq-rules-check
       ]
     # if: always() && (github.event_name == 'push' || github.event_name == 'pull_request')
     if: always() && (github.event_name == 'push')

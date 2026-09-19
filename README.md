@@ -146,24 +146,24 @@ output "flow_log_cloudwatch_log_group" {
 ## 📥 Input Variables
 
 | Name                       | Description                            | Type           | Default     | Required |
-| -------------------------- | -------------------------------------- | -------------- | ----------- | -------- |
-| `aws_region`               | 🌍 AWS region                           | `string`       | —           | ✅ yes    |
-| `availability_zone_ids`    | 🧭 Ordered list of pinned AZ IDs        | `list(string)` | —           | ✅ yes    |
-| `name`                     | 🏷️ Name prefix for all resources        | `string`       | `"vpc"`     | no       |
-| `vpc_cidr`                 | 🌐 Primary VPC CIDR block               | `string`       | —           | ✅ yes    |
-| `secondary_vpc_cidr`       | 🌐 Secondary VPC CIDR (null to skip)    | `string`       | `null`      | no       |
-| `num_public_subnets`       | 🌍 Number of public subnets             | `number`       | `2`         | no       |
-| `num_private_subnets`      | 🔒 Number of private subnets per layer  | `number`       | `2`         | no       |
-| `num_layers`               | 🗂️ Number of private subnet layers      | `number`       | `1`         | no       |
-| `instance_tenancy`         | 🖥️ VPC tenancy (default/dedicated/host) | `string`       | `"default"` | no       |
-| `create_nat_gateway`       | 🔀 Create NAT Gateway                   | `bool`         | `true`      | no       |
-| `single_nat_gateway`       | 🔀 Use one NAT GW instead of one per AZ | `bool`         | `false`     | no       |
-| `enable_flow_logs`         | 📋 Enable VPC Flow Logs                 | `bool`         | `true`      | no       |
-| `flow_logs_retention_days` | 🗓️ Flow log CloudWatch retention days   | `number`       | `30`        | no       |
-| `enable_dns_hostnames`     | 🔍 Enable DNS hostnames                 | `bool`         | `true`      | no       |
-| `enable_dns_support`       | 🔍 Enable DNS support                   | `bool`         | `true`      | no       |
-| `cloudwatch_alarm_actions` | 🔔 SNS ARNs for alarm notifications     | `list(string)` | `[]`        | no       |
-| `tags`                     | 🏷️ Common tags                          | `map(string)`  | `{}`        | no       |
+| -------------------------- | -------------------------------------- | -------------- | ----------- | :------: |
+| `aws_region`               | 🌍 AWS region                           | `string`       | —           |  ✅ yes   |
+| `availability_zone_ids`    | 🧭 Ordered list of pinned AZ IDs        | `list(string)` | —           |  ✅ yes   |
+| `name`                     | 🏷️ Name prefix for all resources        | `string`       | `"vpc"`     |    no    |
+| `vpc_cidr`                 | 🌐 Primary VPC CIDR block               | `string`       | —           |  ✅ yes   |
+| `secondary_vpc_cidr`       | 🌐 Secondary VPC CIDR (null to skip)    | `string`       | `null`      |    no    |
+| `num_public_subnets`       | 🌍 Number of public subnets             | `number`       | `2`         |    no    |
+| `num_private_subnets`      | 🔒 Number of private subnets per layer  | `number`       | `2`         |    no    |
+| `num_layers`               | 🗂️ Number of private subnet layers      | `number`       | `1`         |    no    |
+| `instance_tenancy`         | 🖥️ VPC tenancy (default/dedicated/host) | `string`       | `"default"` |    no    |
+| `create_nat_gateway`       | 🔀 Create NAT Gateway                   | `bool`         | `true`      |    no    |
+| `single_nat_gateway`       | 🔀 Use one NAT GW instead of one per AZ | `bool`         | `false`     |    no    |
+| `enable_flow_logs`         | 📋 Enable VPC Flow Logs                 | `bool`         | `true`      |    no    |
+| `flow_logs_retention_days` | 🗓️ Flow log CloudWatch retention days   | `number`       | `30`        |    no    |
+| `enable_dns_hostnames`     | 🔍 Enable DNS hostnames                 | `bool`         | `true`      |    no    |
+| `enable_dns_support`       | 🔍 Enable DNS support                   | `bool`         | `true`      |    no    |
+| `cloudwatch_alarm_actions` | 🔔 SNS ARNs for alarm notifications     | `list(string)` | `[]`        |    no    |
+| `tags`                     | 🏷️ Common tags                          | `map(string)`  | `{}`        |    no    |
 
 ## 📤 Outputs
 

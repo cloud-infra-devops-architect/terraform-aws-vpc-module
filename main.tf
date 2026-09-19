@@ -1,16 +1,7 @@
-data "aws_availability_zones" "available" {
-  # state = "available"
-
-  # filter {
-  #   name   = "zone-type"
-  #   values = ["availability-zone"]
-  # }
-}
-
 locals {
   # Use only as many AZs as the max subnets requested
   max_subnets = max(var.num_public_subnets, var.num_private_subnets)
-  azs         = slice(data.aws_availability_zones.available.names, 0, local.max_subnets)
+  az_ids      = slice(var.availability_zone_ids, 0, local.max_subnets)
 
   # Number of NAT gateways: one per AZ or just one
   nat_count = var.create_nat_gateway ? (var.single_nat_gateway ? 1 : var.num_public_subnets) : 0
@@ -56,7 +47,7 @@ resource "aws_subnet" "public" {
   count                   = var.num_public_subnets
   vpc_id                  = aws_vpc.this.id
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
-  availability_zone       = local.azs[count.index % length(local.azs)]
+  availability_zone_id    = local.az_ids[count.index % length(local.az_ids)]
   map_public_ip_on_launch = false
   tags                    = merge(local.common_tags, { Name = "${var.name}-public-${count.index + 1}", Tier = "public" })
 }
@@ -102,7 +93,7 @@ resource "aws_subnet" "private" {
   count             = var.num_layers * var.num_private_subnets
   vpc_id            = aws_vpc.this.id
   cidr_block        = cidrsubnet(var.vpc_cidr, 8, var.num_public_subnets + count.index)
-  availability_zone = local.azs[count.index % length(local.azs)]
+  availability_zone_id = local.az_ids[count.index % length(local.az_ids)]
 
   tags = merge(local.common_tags, {
     Name  = "${var.name}-private-layer${floor(count.index / var.num_private_subnets) + 1}-${count.index % var.num_private_subnets + 1}"

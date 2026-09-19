@@ -73,6 +73,21 @@ variable "num_layers" {
   }
 }
 
+variable "availability_zone_ids" {
+  description = "Ordered list of Availability Zone IDs to pin subnet placement (e.g. [\"use1-az1\", \"use1-az2\"])."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.availability_zone_ids) >= max(var.num_public_subnets, var.num_private_subnets)
+    error_message = "availability_zone_ids must include at least max(num_public_subnets, num_private_subnets) zone IDs."
+  }
+
+  validation {
+    condition     = alltrue([for zone_id in var.availability_zone_ids : can(regex("^[a-z]{2,5}[0-9]-az[0-9]+$", zone_id))])
+    error_message = "Each availability_zone_ids value must be a valid AZ ID like use1-az1."
+  }
+}
+
 variable "instance_tenancy" {
   description = "Tenancy option for instances launched in the VPC (default, dedicated, host)"
   type        = string

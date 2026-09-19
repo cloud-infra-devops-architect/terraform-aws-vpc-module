@@ -10,8 +10,8 @@ module "vpc" {
   source = "../"
 
   # ── Required inputs ────────────────────────────────────────────────────────
-  aws_region = "us-east-1"
-  vpc_cidr   = "10.0.0.0/16"
+  aws_region            = "us-east-1"
+  vpc_cidr              = "10.0.0.0/16"
   availability_zone_ids = ["use1-az1", "use1-az2", "use1-az3"]
 
   # ── Optional: naming & tagging ─────────────────────────────────────────────

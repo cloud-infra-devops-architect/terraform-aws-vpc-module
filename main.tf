@@ -90,9 +90,9 @@ resource "aws_nat_gateway" "this" {
 
 resource "aws_subnet" "private" {
   # total = num_layers * num_private_subnets
-  count             = var.num_layers * var.num_private_subnets
-  vpc_id            = aws_vpc.this.id
-  cidr_block        = cidrsubnet(var.vpc_cidr, 8, var.num_public_subnets + count.index)
+  count                = var.num_layers * var.num_private_subnets
+  vpc_id               = aws_vpc.this.id
+  cidr_block           = cidrsubnet(var.vpc_cidr, 8, var.num_public_subnets + count.index)
   availability_zone_id = local.az_ids[count.index % length(local.az_ids)]
 
   tags = merge(local.common_tags, {

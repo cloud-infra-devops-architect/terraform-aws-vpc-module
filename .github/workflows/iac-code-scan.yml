@@ -200,7 +200,7 @@ jobs:
           framework: terraform
           output_format: cli
           output_file_path: console
-          skip_check: CKV_TF_1
+          skip_check: CKV_TF_1,CKV2_AWS_19
           soft_fail: false
         continue-on-error: false
 

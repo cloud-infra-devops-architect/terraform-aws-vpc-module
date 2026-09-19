@@ -1,4 +1,4 @@
-# It is reusable workflow that can be called in other workflow
+# It is reusable workflow that can be called in other workflow(s)
 # Purpose :
 # Unless Checkov, Trivy code scan checks pass, the push/commit to the target branch will not happen or the PR will not pass & cannot be merged to the destination branch.
 # If there are no examples/main.tf file in the repo, push/commit to the target branch or the PR will not pass & cannot be merged to the destination branch.
@@ -427,7 +427,9 @@ jobs:
 
       - name: Terraform Init
         id: init
-        run: terraform init -input=false
+        run: |
+          echo -e "access_key = \"${AWS_ACCESS_KEY_ID}\"\nsecret_key = \"${AWS_SECRET_ACCESS_KEY}\"\ntoken = \"${AWS_SESSION_TOKEN}\"\nregion = \"${AWS_REGION}\"" | tee credentials.auto.tfvars
+          terraform init -input=false
         working-directory: ${{ env.tfcode_path }}
 
       - name: Terraform Validate
@@ -437,17 +439,30 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -no-color -input=false 2>&1 | tee /tmp/tfplan.txt
+        run: terraform plan -no-color -var-file="credentials.auto.tfvars" -input=false -out=/tmp/tfplan 2>&1 | tee /tmp/plan_output.txt
         working-directory: ${{ env.tfcode_path }}
         continue-on-error: true # Don't fail the job here, we want to capture the plan output and post it to the PR comment for review
-
+      - name: Save Terraform Plan Output
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -f /tmp/tfplan ]; then
+            terraform show -no-color /tmp/tfplan > /tmp/plan.txt
+          else
+            {
+              echo "Terraform plan did not produce a saved plan file (/tmp/tfplan)."
+              echo "The plan step likely failed; captured command output is below:"
+              echo ""
+              cat /tmp/plan_output.txt
+            } > /tmp/plan.txt
+          fi
       - name: Post Plan output to PR
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v9.0.0
         with:
           github-token: ${{ github.token }}
           script: |
             const fs = require('fs');
-            const raw = fs.readFileSync('/tmp/tfplan.txt', 'utf8');
+            const raw = fs.readFileSync('/tmp/plan.txt', 'utf8');
             const maxLen = 65000;
             const plan = raw.length > maxLen
               ? raw.substring(0, maxLen) + '\n\n... output truncated (> 65 000 chars) ...'

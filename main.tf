@@ -1,5 +1,6 @@
 data "aws_availability_zones" "available" {
-  state = "available"
+  state            = "available"
+  exclude_zone_ids = []
 }
 
 locals {

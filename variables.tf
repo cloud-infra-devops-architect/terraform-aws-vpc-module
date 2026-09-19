@@ -1,3 +1,4 @@
+/*
 variable "aws_region" {
   description = "AWS region to deploy resources"
   type        = string
@@ -18,6 +19,7 @@ variable "aws_account_id" {
     error_message = "aws_account_id must be a valid 12-digit AWS account ID."
   }
 }
+*/
 
 variable "vpc_cidr" {
   description = "Primary CIDR block for the VPC"

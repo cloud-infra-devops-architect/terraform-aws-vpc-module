@@ -1,1 +1,5 @@
-# No input variables — all values are hardcoded in this example.
+variable "region" {
+  description = "AWS region to deploy resources into"
+  type        = string
+  default     = "us-east-1"
+}

@@ -54,6 +54,7 @@ env:
 jobs:
   pre-commit-hooks:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     permissions:
       contents: read
     steps:
@@ -344,7 +345,7 @@ jobs:
         tflint-scan,
         amazonq-rules-check,
       ]
-    if: always()
+    if: always() && (github.event_name == 'push' || github.event_name == 'pull_request')
     steps:
       - name: Scan Results Summary
         run: |

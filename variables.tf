@@ -20,7 +20,6 @@ variable "aws_account_id" {
   }
 }
 */
-
 variable "vpc_cidr" {
   description = "Primary CIDR block for the VPC"
   type        = string

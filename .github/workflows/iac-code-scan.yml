@@ -52,7 +52,6 @@ env:
 jobs:
   pre-commit-hooks:
     runs-on: ubuntu-latest
-    # if: github.event_name == 'push' || github.event_name == 'pull_request'
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     permissions:
       contents: read
@@ -343,7 +342,7 @@ jobs:
         checkov-scan,
         trivy-scan,
         tflint-scan,
-        amazonq-rules-check,
+        amazonq-rules-check
       ]
     if: always() && (github.event_name == 'push' || github.event_name == 'pull_request')
     steps:

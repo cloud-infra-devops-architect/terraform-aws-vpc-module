@@ -442,6 +442,7 @@ jobs:
         run: terraform plan -no-color -var-file="credentials.auto.tfvars" -input=false -out=/tmp/tfplan 2>&1 | tee /tmp/plan_output.txt
         working-directory: ${{ env.tfcode_path }}
         continue-on-error: true # Don't fail the job here, we want to capture the plan output and post it to the PR comment for review
+      
       - name: Save Terraform Plan Output
         if: github.event_name == 'pull_request'
         run: |
@@ -455,6 +456,7 @@ jobs:
               cat /tmp/plan_output.txt
             } > /tmp/plan.txt
           fi
+      
       - name: Post Plan output to PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v9.0.0

@@ -1,9 +1,9 @@
 # It is reusable workflow that can be called in other workflow
 # Purpose :
-# Unless terraform Init, Validate, Plan checks pass, the push/commit to the target branch will not happen or the PR will not pass & cannot be merged to the destination branch.
 # Unless Checkov, Trivy code scan checks pass, the push/commit to the target branch will not happen or the PR will not pass & cannot be merged to the destination branch.
 # If there are no examples/main.tf file in the repo, push/commit to the target branch or the PR will not pass & cannot be merged to the destination branch.
 # If there are no README.md file in the root of the repo, push/commit to the target branch or the PR will not pass & cannot be merged to the destination branch.
+# Unless terraform format, Init, Validate, Plan checks pass, the PR will not pass & cannot be merged to the destination branch.
 # If any of the above four checks fail, the push/commit to the target branch or the PR will not pass & cannot be merged to the destination branch
 
 name: iac-code-quality-checks
